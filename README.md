@@ -1,108 +1,18 @@
-# Invoice Spend & Anomaly Intelligence Hub
-
-[![Python 3.14](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-Interactive%20UI-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-Star%20Schema-D71F00)](https://www.sqlalchemy.org/)
-[![Gemini File API](https://img.shields.io/badge/Google%20Gemini-File%20API-4285F4?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
-[![Pytest](https://img.shields.io/badge/Tests-Pytest-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
-
-منظومة تحليل وتدقيق فواتير ومصروفات مبنية على **Python 3.14** و **Streamlit** و **SQLAlchemy / SQLite** و **Google Gemini File API**، تجمع بين الاستخراج المباشر للمستندات (`PDF`، `CSV`، `XLSX`)، والتدقيق الحسابي الحتمي، وكشف الأنماط الشاذة ومؤشرات المخاطر العالية، وتخزين البيانات في مستودع تحليلي بمخطط نجمة (`Star Schema`) جاهز للتصدير والربط ضمن **BABI.AI**.
-
----
-
-## نظرة عامة على المعمارية
-
-ينقسم المشروع إلى أربع طبقات معيارية واضحة لتسهيل الصيانة والاختبار والتوسع:
-
-| الطبقة | المسار | الدور الوظيفي |
-| :--- | :--- | :--- |
-| **الاستخراج (`Extraction`)** | `app/extraction/` | قراءة الفواتير بصيغة `PDF` مباشرة عبر `Gemini File API`، واستيراد ملفات `CSV` و `XLSX` وتجميع البنود حسب الفاتورة والمورّد، وحساب `SHA-256` لمنع التكرار الحرفي. |
-| **الذكاء والتدقيق (`Intelligence`)** | `app/intelligence/audit_engine.py` | محرك تدقيق حسابي حتمي وتقييم للمخاطر (`0–100`) وتصنيفها (`LOW` / `MEDIUM` / `HIGH`) وفق أوزان قابلة للتخصيص أو التعطيل. |
-| **المستودع (`Warehouse`)** | `app/warehouse/` | نماذج `SQLAlchemy` ومستودع البيانات بمخطط نجمة (`dim_vendors`، `dim_dates`، `fact_invoices`، `fact_invoice_lines`) مع استعلامات تحليلية وإعادة تهيئة آمنة. |
-| **الواجهة (`UI`)** | `app/ui/streamlit_app.py` | لوحة تحكم تفاعلية لإدارة العتبات، وتخصيص أوزان القواعد، وإعادة تهيئة المستودع، واستعراض المؤشرات والبنود، وتصدير التقارير (`CSV`، `XLSX`، `JSON`). |
-
----
-
-## قواعد التدقيق ومؤشرات المخاطر
-
-يطبّق المحرك فحصاً حسابياً صارماً (`quantity * unit_price = line_total` ومطابقة `Subtotal` والضرائب والخصومات مع `Grand Total`) إلى جانب قواعد كشف الشذوذ والمخاطر:
-
-- **`ARITHMETIC_MISMATCH`:** رصد أي فرق حسابي في بنود الفاتورة أو الإجماليات.
-- **`PRICE_SPIKE`:** اكتشاف ارتفاع سعر الوحدة عن المتوسط التاريخي لنفس المورّد بنسبة تتجاوز العتبة المحددة (`Price Spike Threshold %`).
-- **`NEAR_DUPLICATE_INVOICE`:** رصد فواتير متقاربة في المبلغ والتاريخ لنفس المورّد ضمن النافذة الزمنية المحددة.
-- **`SPLIT_INVOICE_PATTERN`:** رصد احتمالية تجزئة الفواتير ضمن سقف المشتريات المعتمد (`Procurement Threshold`) خلال النافذة الزمنية.
-- **`HIGH_RISK_RED_FLAGS`:** رصد المؤشرات النصية عالية الخطورة في البنود أو الشروط (مثل غياب السندات/الأوامر، أو التعيينات العامة، أو الاستعجال غير المبرر).
-- **`THIRD_PARTY_OR_OFFSHORE_PAYEE`:** تنبيه الدفع لطرف ثالث أو حسابات/جهات `Offshore` أو مناطق حرة.
-- **`ROUND_HIGH_VALUE_TOTAL`:** رصد المبالغ الإجمالية الكبيرة المستديرة.
-- **`NIF_MISMATCH` / `INVALID_NIF_FORMAT` / `BANK_ACCOUNT_CHANGED`:** التحقق من صيغة المعرف الجبائي (`NIF`) وتغيّر المعرف أو الحساب البنكي للمورّد.
-
----
-
-## هيكل المستودع
-
-```text
-invoice-anomaly-hub/
-├── app/
-│   ├── config.py
-│   ├── schemas.py
-│   ├── extraction/
-│   │   ├── ai_parser.py
-│   │   ├── pdf_reader.py
-│   │   └── tabular_importer.py
-│   ├── intelligence/
-│   │   └── audit_engine.py
-│   ├── ui/
-│   │   └── streamlit_app.py
-│   └── warehouse/
-│       ├── models.py
-│       └── repository.py
-├── tests/
-│   └── test_engine.py
-├── .env.example
-├── .gitignore
-├── README.md
-└── requirements.txt
-```
-
----
-
-## الإعداد والتشغيل
-
-### 1. إعداد متغيرات البيئة
-انسخ ملف `.env.example` إلى `.env` وحدّث القيم حسب بيئتك:
-
-```powershell
-Set-Location -Path "C:\projects\invoice-anomaly-hub"
-Copy-Item .env.example .env
-```
-
-المتغيرات المعتمدة في `.env.example`:
-- `GEMINI_API_KEY`: مفتاح واجهة `Google Gemini API` لمعالجة ملفات `PDF`.
-- `GEMINI_MODEL`: نموذج `Gemini` المعتمد للاستخراج.
-- `DATABASE_URL`: مسار قاعدة بيانات `SQLite` (الافتراضي: `sqlite:///./data/anomaly_hub.db`).
-- `PRICE_SPIKE_THRESHOLD_PCT`: النسبة المئوية الافتراضية لقفزات الأسعار (الافتراضي: `25.0`).
-- `NEAR_DUPLICATE_DAYS`: النافذة الزمنية بالأيام للفواتير شبه المكررة وتجزئة الفواتير (الافتراضي: `7`).
-- `PROCUREMENT_THRESHOLD`: سقف المشتريات المرجعي بالدينار الجزائري (الافتراضي: `3500000.0`).
-
-### 2. تشغيل اختبارات الوحدة (`Pytest`)
-
-```powershell
-Set-Location -Path "C:\projects\invoice-anomaly-hub"
-$env:PYTHONPATH = "C:\projects\invoice-anomaly-hub"
-& "C:\Python314\python.exe" -m pytest -v
-```
-
-### 3. تشغيل لوحة التحكم (`Streamlit`)
-
-```powershell
-Set-Location -Path "C:\projects\invoice-anomaly-hub"
-$env:PYTHONPATH = "C:\projects\invoice-anomaly-hub"
-& "C:\Python314\python.exe" -m streamlit run app\ui\streamlit_app.py
-```
-
----
-
-## التكامل مع BABI.AI
-
-يُعد هذا المشروع أحد مشاريع **BABI.AI** في مجال هندسة البيانات وتحليل المخاطر المالية، ويمكن ربطه مباشرة عبر المستودع:
-`https://github.com/babiabdealmomin-automation/invoice-anomaly-hub`
+<div align="center">
+​<!-- Animated Top Wave Banner with Full Name -->
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0F172A,50:0284C7,100:38BDF8&height=210&section=header&text=BABI%20ABDEALMOMIN&fontSize=44&fontColor=FFFFFF&fontAlignY=38&desc=BABI.AI%20%E2%80%A2%20AI%20Automation%20%7C%20Data%20Engineering%20%7C%20Audit%20Intelligence&descSize=16&descAlignY=62&animation=fadeIn" width="100%" alt="BABI ABDEALMOMIN Banner" />
+​<!-- Dynamic Typing Animation -->
+<a href="https://github.com/babiabdealmomin-automation">
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=22&duration=2800&pause=900&color=38BDF8&center=true&vCenter=true&multiline=true&repeat=true&width=820&height=75&lines=BABI+ABDEALMOMIN+%7C+Builder+of+BABI.AI+%F0%9F%A4%96;AI+Document+Intelligence+%E2%80%A2+Star+Schema+Warehouses+%E2%80%A2+Risk+Engines;Turning+Raw+Business+Data+into+Auditable%2C+Automated+Decisions+%E2%9A%A1" alt="Typing SVG" />
+</a>
+​<p>
+<a href="https://github.com/babiabdealmomin-automation">
+<img src="https://img.shields.io/badge/Brand-BABI.AI-0F172A?style=for-the-badge&logo=probot&logoColor=38BDF8" alt="BABI.AI" />
+</a>
+<a href="https://github.com/babiabdealmomin-automation?tab=repositories">
+<img src="https://img.shields.io/badge/Domain-AI_Automation_%26_Data_Eng-1E293B?style=for-the-badge&logo=python&logoColor=FACC15" alt="Domain" />
+</a>
+<img src="https://img.shields.io/badge/Location-Algeria-065F46?style=for-the-badge&logo=googlemaps&logoColor=white" alt="Algeria" />
+</p>
+​</div>
+​🧠 Engineering DNA — How I Build Systems
